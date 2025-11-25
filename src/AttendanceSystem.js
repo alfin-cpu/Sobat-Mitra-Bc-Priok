@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, MapPin, Loader, Check, LogIn, LogOut, Clock, AlertTriangle } from 'lucide-react';
+import { Camera, MapPin, Loader, Check, LogIn, LogOut, Clock, AlertTriangle, AlertCircle, RefreshCw, X } from 'lucide-react';
 
 const GOOGLE_SCRIPT_URL = "GANTI_DENGAN_URL_GAS_ANDA"; // !!! GANTI INI !!!
+const HISTORY_API_URL = "GANTI_DENGAN_URL_GAS_ANDA_YG_SAMA"; // Gunakan URL GAS yang sama
 
 const AttendanceSystem = () => {
     const [status, setStatus] = useState('Masuk');
@@ -11,36 +12,22 @@ const AttendanceSystem = () => {
     const [location, setLocation] = useState(null);
     const [photoData, setPhotoData] = useState(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
+    
+    // State baru untuk Riwayat
+    const [showHistory, setShowHistory] = useState(false);
+    const [history, setHistory] = useState([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
-    const MAX_DISTANCE_KM = 0.5; // Maksimum 500 meter
-
-    // Lokasi Kantor (Ganti sesuai koordinat kantor Anda)
-    const OFFICE_LOCATION = {
-        lat: -6.108250, // Contoh: Pelabuhan Tanjung Priok
-        lon: 106.882480, // Contoh: Pelabuhan Tanjung Priok
-    };
+    
+    // (Dihapus: MAX_DISTANCE_KM, OFFICE_LOCATION, deg2rad, getDistance)
 
     useEffect(() => {
         const timer = setInterval(() => setDateTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
-
-    const deg2rad = (deg) => deg * (Math.PI / 180);
-
-    const getDistance = (lat1, lon1, lat2, lon2) => {
-        const R = 6371; // Radius bumi dalam km
-        const dLat = deg2rad(lat2 - lat1);
-        const dLon = deg2rad(lon2 - lon1);
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c; // Jarak dalam km
-    };
-
+    
     const capturePhoto = useCallback(() => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
@@ -110,25 +97,12 @@ const AttendanceSystem = () => {
         setIsLoading(true);
         setMessage('Memproses data...');
 
-        const distance = getDistance(
-            location.lat,
-            location.lon,
-            OFFICE_LOCATION.lat,
-            OFFICE_LOCATION.lon
-        );
-
-        if (distance > MAX_DISTANCE_KM) {
-            setMessage(`Gagal: Jarak Anda ${distance.toFixed(2)} km. Terlalu jauh dari kantor (${MAX_DISTANCE_KM} km).`);
-            setIsLoading(false);
-            return;
-        }
-
         const payload = {
             action: status.toLowerCase(),
             waktu: dateTime.toLocaleString('id-ID'),
             lokasi: `${location.lat}, ${location.lon}`,
             foto: photoData,
-            jarak: distance.toFixed(2) + ' km'
+            jarak: '0.00 km' 
         };
 
         try {
@@ -139,16 +113,35 @@ const AttendanceSystem = () => {
                 body: JSON.stringify(payload)
             });
 
-            // Karena menggunakan mode 'no-cors' (khas Google Apps Script), kita tidak bisa cek 'ok'
             setMessage(`Sukses! Absensi ${status} berhasil dicatat.`);
             setPhotoData(null);
             setLocation(null);
             stopCamera();
+            if (showHistory) fetchHistory(); // Refresh riwayat jika sedang ditampilkan
         } catch (error) {
             setMessage('Error saat mengirim data. Cek koneksi internet.');
             console.error("Fetch error:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // FUNGSI BARU UNTUK MENGAMBIL RIWAYAT
+    const fetchHistory = async () => {
+        setIsHistoryLoading(true);
+        try {
+            const response = await fetch(HISTORY_API_URL);
+            if (!response.ok) throw new Error('Gagal mengambil data riwayat.');
+            
+            const data = await response.json();
+            // Urutkan berdasarkan waktu (asumsi kolom pertama adalah waktu/tanggal)
+            data.reverse(); 
+            setHistory(data);
+        } catch (error) {
+            console.error("Error fetching history:", error);
+            setMessage("Gagal memuat riwayat: " + error.message);
+        } finally {
+            setIsHistoryLoading(false);
         }
     };
 
@@ -161,10 +154,126 @@ const AttendanceSystem = () => {
     };
 
     useEffect(() => {
-        // Otomatis deteksi lokasi saat komponen dimuat atau status berubah
         getLocation();
         return () => stopCamera();
     }, [status]);
+    
+    // Fungsi untuk menampilkan pesan tambahan di Absensi Keluar
+    const KeteranganKeluar = () => (
+        <div className="mb-6 p-4 rounded-xl bg-red-100 border border-red-300 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-red-800">
+                PERHATIAN: Absen keluar wajib dilakukan saat jam kerja berakhir. Jika absen di luar jam kerja, harus melampirkan keterangan Dinas Luar.
+            </p>
+        </div>
+    );
+    
+    // Handler untuk menampilkan riwayat
+    const handleShowHistory = () => {
+        setShowHistory(true);
+        fetchHistory();
+    }
+
+    if (showHistory) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                <div className="w-full max-w-4xl bg-white shadow-xl rounded-lg p-6">
+                    <div className="flex justify-between items-center mb-6 border-b pb-3">
+                        <h2 className="text-2xl font-bold text-indigo-800">Riwayat Absensi (10 Terakhir)</h2>
+                        <div className='flex gap-2'>
+                            <button
+                                onClick={fetchHistory}
+                                className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                                disabled={isHistoryLoading}
+                                title="Refresh Riwayat"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${isHistoryLoading ? 'animate-spin' : ''}`} />
+                            </button>
+                            <button
+                                onClick={() => setShowHistory(false)}
+                                className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                                title="Tutup Riwayat"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {isHistoryLoading && (
+                        <div className="text-center p-4 text-indigo-600">
+                            <Loader className="w-6 h-6 inline mr-2 animate-spin" /> Memuat data riwayat...
+                        </div>
+                    )}
+
+                    {!isHistoryLoading && history.length === 0 && (
+                        <div className="text-center p-4 text-gray-500">
+                            Belum ada riwayat absensi yang tercatat.
+                        </div>
+                    )}
+                    
+                    {!isHistoryLoading && history.length > 0 && (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jarak</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {history.slice(0, 10).map((record, index) => (
+                                        <tr key={index}>
+                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {record.Waktu}
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                    record.Aksi === 'masuk' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                                                }`}>
+                                                    {record.Aksi.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap">
+                                                {/* Tinjauan Foto */}
+                                                {record.URL_Foto && record.URL_Foto !== 'N/A' ? (
+                                                    <a href={record.URL_Foto} target="_blank" rel="noopener noreferrer">
+                                                        
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-gray-400">N/A</span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {/* Tautan Google Maps */}
+                                                {record.Lokasi && (
+                                                    <a 
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${record.Lokasi}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:underline flex items-center"
+                                                        title={record.Lokasi}
+                                                    >
+                                                        Lihat Peta <MapPin className="w-4 h-4 ml-1" />
+                                                    </a>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {record.Jarak}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -178,6 +287,13 @@ const AttendanceSystem = () => {
                             day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
                         })}
                     </div>
+                    {/* Tombol Lihat Riwayat */}
+                    <button
+                        onClick={handleShowHistory}
+                        className="mt-4 w-full py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
+                    >
+                        Lihat Riwayat Absensi
+                    </button>
                 </header>
 
                 <div className="flex justify-center space-x-4 mb-6 p-2 bg-gray-50 rounded-lg">
@@ -196,6 +312,10 @@ const AttendanceSystem = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    
+                    {/* Keterangan Absensi Keluar */}
+                    {status === 'Keluar' && <KeteranganKeluar />}
+
                     {/* Bagian Kamera */}
                     <div className="border border-gray-300 rounded-lg overflow-hidden p-2 text-center">
                         <h3 className="font-semibold mb-2">Ambil Foto ({status})</h3>
