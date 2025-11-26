@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, MapPin, Loader, Check, LogIn, LogOut, Clock, AlertTriangle, AlertCircle, RefreshCw, X } from 'lucide-react';
 
-// !!! GANTI KEDUA URL INI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA !!!
-const GOOGLE_SCRIPT_URL = "GANTI_DENGAN_URL_GAS_ANDA"; 
-const HISTORY_API_URL = "GANTI_DENGAN_URL_GAS_ANDA_YG_SAMA"; 
-// =========================================================================
+// !!! PASTIKAN URL GAS ANDA DI SINI !!!
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzzkCZs1RPGH7UuC1LY5-db-SDcnUVp5QflSpYfUSGZPWygweDsLUGPIOWGgqtypn4/exec"; 
+const HISTORY_API_URL = "https://script.google.com/macros/s/AKfycbxzzkCZs1RPGH7UuC1LY5-db-SDcnUVp5QflSpYfUSGZPWygweDsLUGPIOWGgqtypn4/exec"; 
+// ===================================
 
 const AttendanceSystem = () => {
     const [status, setStatus] = useState('Masuk');
@@ -15,9 +15,9 @@ const AttendanceSystem = () => {
     const [photoData, setPhotoData] = useState(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
     
-    // State untuk Pertanyaan Persetujuan Absensi Keluar
-    const [isSupervisorApproved, setIsSupervisorApproved] = useState(''); // YA / TIDAK
-    const [isFormFilled, setIsFormFilled] = useState(''); // YA / TIDAK
+    // State untuk Pertanyaan Wajib Absensi Keluar
+    const [isSupervisorApproved, setIsSupervisorApproved] = useState(''); 
+    const [isFormFilled, setIsFormFilled] = useState(''); 
     
     // STATE BARU: Keperluan
     const [necessity, setNecessity] = useState(''); 
@@ -29,8 +29,6 @@ const AttendanceSystem = () => {
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
-
-    // Dihapus: MAX_DISTANCE_KM, OFFICE_LOCATION, deg2rad, getDistance (Kode radius dihapus total)
 
     useEffect(() => {
         const timer = setInterval(() => setDateTime(new Date()), 1000);
@@ -309,7 +307,7 @@ const AttendanceSystem = () => {
                                     <tr>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keperluan</th> {/* Header Baru */}
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keperluan</th> 
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
                                     </tr>
@@ -356,7 +354,6 @@ const AttendanceSystem = () => {
                                                     </a>
                                                 )}
                                             </td>
-                                            {/* Jarak Dihapus dari Tampilan Riwayat untuk menghemat ruang */}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -373,8 +370,8 @@ const AttendanceSystem = () => {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white shadow-xl rounded-lg p-6">
                 <header className="text-center mb-6">
-                    <h1 className="text-3xl font-bold text-indigo-800">Izin Keluar Kantor</h1>
-                    <p className="text-gray-600 mt-1">Mitra KPU BC Tanjung Priok</p>
+                    <h1 className="text-3xl font-bold text-indigo-800">Absensi PPNPN</h1>
+                    <p className="text-gray-600 mt-1">BC Tanjung Priok</p>
                     <div className="flex items-center justify-center mt-3 text-sm text-gray-700">
                         <Clock className="w-4 h-4 mr-2" />
                         {dateTime.toLocaleString('id-ID', {
