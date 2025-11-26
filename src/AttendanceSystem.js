@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, MapPin, Loader, Check, LogIn, LogOut, Clock, AlertTriangle, AlertCircle, RefreshCw, X } from 'lucide-react';
 
-const GOOGLE_SCRIPT_URL = "GANTI_DENGAN_URL_GAS_ANDA"; // !!! GANTI INI !!!
-const HISTORY_API_URL = "GANTI_DENGAN_URL_GAS_ANDA_YG_SAMA"; // Gunakan URL GAS yang sama
+// !!! GANTI KEDUA URL INI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA !!!
+const GOOGLE_SCRIPT_URL = "GANTI_DENGAN_URL_GAS_ANDA"; 
+const HISTORY_API_URL = "GANTI_DENGAN_URL_GAS_ANDA_YG_SAMA"; 
+// =========================================================================
 
 const AttendanceSystem = () => {
     const [status, setStatus] = useState('Masuk');
@@ -13,21 +15,28 @@ const AttendanceSystem = () => {
     const [photoData, setPhotoData] = useState(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
     
-    // State baru untuk Riwayat
+    // State untuk Pertanyaan Persetujuan Absensi Keluar
+    const [isSupervisorApproved, setIsSupervisorApproved] = useState(''); // YA / TIDAK
+    const [isFormFilled, setIsFormFilled] = useState(''); // YA / TIDAK
+    
+    // STATE BARU: Keperluan
+    const [necessity, setNecessity] = useState(''); 
+
+    // State untuk Riwayat
     const [showHistory, setShowHistory] = useState(false);
     const [history, setHistory] = useState([]);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
-    
-    // (Dihapus: MAX_DISTANCE_KM, OFFICE_LOCATION, deg2rad, getDistance)
+
+    // Dihapus: MAX_DISTANCE_KM, OFFICE_LOCATION, deg2rad, getDistance (Kode radius dihapus total)
 
     useEffect(() => {
         const timer = setInterval(() => setDateTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
-    
+
     const capturePhoto = useCallback(() => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
@@ -89,6 +98,19 @@ const AttendanceSystem = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Cek Validasi Pertanyaan Wajib dan Field Keperluan
+        if (status === 'Keluar') {
+            if (isSupervisorApproved !== 'YA' || isFormFilled !== 'YA') {
+                setMessage('Gagal: Absensi Keluar memerlukan persetujuan Pengawas dan pengisian Form SUBBAG TURT.');
+                return;
+            }
+            if (!necessity.trim()) {
+                 setMessage('Gagal: Keperluan (tujuan keluar) wajib diisi.');
+                 return;
+            }
+        }
+        
         if (!photoData || !location) {
             setMessage('Mohon ambil foto dan pastikan lokasi terdeteksi.');
             return;
@@ -101,8 +123,9 @@ const AttendanceSystem = () => {
             action: status.toLowerCase(),
             waktu: dateTime.toLocaleString('id-ID'),
             lokasi: `${location.lat}, ${location.lon}`,
-            foto: photoData,
-            jarak: '0.00 km' 
+            foto: photoData, // Data Base64 foto dikirim ke GAS
+            jarak: '0.00 km', // Nilai statis
+            keperluan: status === 'Keluar' ? necessity : 'N/A' // DATA BARU
         };
 
         try {
@@ -116,8 +139,9 @@ const AttendanceSystem = () => {
             setMessage(`Sukses! Absensi ${status} berhasil dicatat.`);
             setPhotoData(null);
             setLocation(null);
+            setNecessity(''); // Reset keperluan
             stopCamera();
-            if (showHistory) fetchHistory(); // Refresh riwayat jika sedang ditampilkan
+            if (showHistory) fetchHistory(); 
         } catch (error) {
             setMessage('Error saat mengirim data. Cek koneksi internet.');
             console.error("Fetch error:", error);
@@ -126,7 +150,7 @@ const AttendanceSystem = () => {
         }
     };
 
-    // FUNGSI BARU UNTUK MENGAMBIL RIWAYAT
+    // FUNGSI UNTUK MENGAMBIL RIWAYAT
     const fetchHistory = async () => {
         setIsHistoryLoading(true);
         try {
@@ -134,7 +158,6 @@ const AttendanceSystem = () => {
             if (!response.ok) throw new Error('Gagal mengambil data riwayat.');
             
             const data = await response.json();
-            // Urutkan berdasarkan waktu (asumsi kolom pertama adalah waktu/tanggal)
             data.reverse(); 
             setHistory(data);
         } catch (error) {
@@ -151,6 +174,11 @@ const AttendanceSystem = () => {
         setPhotoData(null);
         setLocation(null);
         stopCamera();
+        
+        // Reset state pertanyaan dan Keperluan
+        setIsSupervisorApproved('');
+        setIsFormFilled('');
+        setNecessity(''); 
     };
 
     useEffect(() => {
@@ -158,13 +186,75 @@ const AttendanceSystem = () => {
         return () => stopCamera();
     }, [status]);
     
-    // Fungsi untuk menampilkan pesan tambahan di Absensi Keluar
+    // Fungsi untuk menampilkan pesan tambahan di Absensi Keluar (Keterangan Lama)
     const KeteranganKeluar = () => (
         <div className="mb-6 p-4 rounded-xl bg-red-100 border border-red-300 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
             <p className="text-sm font-semibold text-red-800">
                 PERHATIAN: Absen keluar wajib dilakukan saat jam kerja berakhir. Jika absen di luar jam kerja, harus melampirkan keterangan Dinas Luar.
             </p>
+        </div>
+    );
+
+    // Komponen Pertanyaan Wajib Absensi Keluar + Keperluan
+    const WajibTanyaKeluar = () => (
+        <div className="space-y-4 p-4 border rounded-lg bg-yellow-50">
+            <h3 className="font-bold text-yellow-800 border-b pb-2">Informasi Wajib Keluar Kantor</h3>
+            
+            {/* Pertanyaan 1: Izin Pengawas */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    1. Apakah anda sudah izin kepada pengawas lantai?
+                </label>
+                <div className="flex space-x-4">
+                    <button 
+                        type="button" 
+                        onClick={() => setIsSupervisorApproved('YA')}
+                        className={`px-4 py-2 text-sm rounded-lg border transition-colors ${isSupervisorApproved === 'YA' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                    >YA</button>
+                    <button 
+                        type="button" 
+                        onClick={() => setIsSupervisorApproved('TIDAK')}
+                        className={`px-4 py-2 text-sm rounded-lg border transition-colors ${isSupervisorApproved === 'TIDAK' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                    >TIDAK</button>
+                </div>
+            </div>
+            
+            {/* Pertanyaan 2: Form SUBBAG TURT */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    2. Apakah anda sudah mengisi form di ruangan SUBBAG TURT Basement?
+                </label>
+                <div className="flex space-x-4">
+                    <button 
+                        type="button" 
+                        onClick={() => setIsFormFilled('YA')}
+                        className={`px-4 py-2 text-sm rounded-lg border transition-colors ${isFormFilled === 'YA' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                    >YA</button>
+                    <button 
+                        type="button" 
+                        onClick={() => setIsFormFilled('TIDAK')}
+                        className={`px-4 py-2 text-sm rounded-lg border transition-colors ${isFormFilled === 'TIDAK' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                    >TIDAK</button>
+                </div>
+            </div>
+
+            {/* FIELD BARU: KEPERLUAN */}
+            <div>
+                <label htmlFor="necessity" className="block text-sm font-medium text-gray-700 mb-2">
+                    3. Keperluan (Tujuan Keluar Kantor Wajib Diisi):
+                </label>
+                <textarea
+                    id="necessity"
+                    value={necessity}
+                    onChange={(e) => setNecessity(e.target.value)}
+                    rows="3"
+                    required
+                    placeholder="Contoh: Mengurus dokumen di Bank BNI cabang Tugu Tani terkait pekerjaan."
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                ></textarea>
+            </div>
+            {/* END FIELD BARU */}
         </div>
     );
     
@@ -180,6 +270,7 @@ const AttendanceSystem = () => {
                 <div className="w-full max-w-4xl bg-white shadow-xl rounded-lg p-6">
                     <div className="flex justify-between items-center mb-6 border-b pb-3">
                         <h2 className="text-2xl font-bold text-indigo-800">Riwayat Absensi (10 Terakhir)</h2>
+                        {/* Tombol Refresh dan Tutup */}
                         <div className='flex gap-2'>
                             <button
                                 onClick={fetchHistory}
@@ -218,9 +309,9 @@ const AttendanceSystem = () => {
                                     <tr>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keperluan</th> {/* Header Baru */}
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jarak</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -236,6 +327,11 @@ const AttendanceSystem = () => {
                                                     {record.Aksi.toUpperCase()}
                                                 </span>
                                             </td>
+                                            {/* Data Keperluan */}
+                                            <td className="px-3 py-4 text-sm text-gray-900 max-w-xs overflow-hidden text-ellipsis">
+                                                {record.Keperluan || record.keperluan || 'N/A'} 
+                                            </td>
+                                            {/* End Data Keperluan */}
                                             <td className="px-3 py-4 whitespace-nowrap">
                                                 {/* Tinjauan Foto */}
                                                 {record.URL_Foto && record.URL_Foto !== 'N/A' ? (
@@ -260,9 +356,7 @@ const AttendanceSystem = () => {
                                                     </a>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {record.Jarak}
-                                            </td>
+                                            {/* Jarak Dihapus dari Tampilan Riwayat untuk menghemat ruang */}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -279,8 +373,8 @@ const AttendanceSystem = () => {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white shadow-xl rounded-lg p-6">
                 <header className="text-center mb-6">
-                    <h1 className="text-3xl font-bold text-indigo-800">Absensi PPNPN</h1>
-                    <p className="text-gray-600 mt-1">BC Tanjung Priok</p>
+                    <h1 className="text-3xl font-bold text-indigo-800">Izin Keluar Kantor</h1>
+                    <p className="text-gray-600 mt-1">Mitra KPU BC Tanjung Priok</p>
                     <div className="flex items-center justify-center mt-3 text-sm text-gray-700">
                         <Clock className="w-4 h-4 mr-2" />
                         {dateTime.toLocaleString('id-ID', {
@@ -313,9 +407,12 @@ const AttendanceSystem = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     
-                    {/* Keterangan Absensi Keluar */}
+                    {/* 1. Keterangan Wajib Absensi Keluar */}
                     {status === 'Keluar' && <KeteranganKeluar />}
 
+                    {/* 2. Pertanyaan Wajib Absensi Keluar + Keperluan */}
+                    {status === 'Keluar' && <WajibTanyaKeluar />}
+                    
                     {/* Bagian Kamera */}
                     <div className="border border-gray-300 rounded-lg overflow-hidden p-2 text-center">
                         <h3 className="font-semibold mb-2">Ambil Foto ({status})</h3>
