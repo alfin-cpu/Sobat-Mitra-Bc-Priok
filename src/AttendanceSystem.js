@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, MapPin, Loader, Check, LogIn, LogOut, Clock, AlertTriangle, AlertCircle, RefreshCw, X } from 'lucide-react';
 
-// !!! PASTIKAN URL GAS ANDA DI SINI !!!
+// URL GOOGLE APPS SCRIPT ANDA
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzzkCZs1RPGH7UuC1LY5-db-SDcnUVp5QflSpYfUSGZPWygweDsLUGPIOWGgqtypn4/exec"; 
 const HISTORY_API_URL = "https://script.google.com/macros/s/AKfycbxzzkCZs1RPGH7UuC1LY5-db-SDcnUVp5QflSpYfUSGZPWygweDsLUGPIOWGgqtypn4/exec"; 
-// ===================================
 
 const AttendanceSystem = () => {
     const [status, setStatus] = useState('Masuk');
@@ -184,7 +183,7 @@ const AttendanceSystem = () => {
         return () => stopCamera();
     }, [status]);
     
-    // Fungsi untuk menampilkan pesan tambahan di Absensi Keluar (Keterangan Lama)
+    // Keterangan Wajib Absensi Keluar
     const KeteranganKeluar = () => (
         <div className="mb-6 p-4 rounded-xl bg-red-100 border border-red-300 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
@@ -252,23 +251,16 @@ const AttendanceSystem = () => {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
                 ></textarea>
             </div>
-            {/* END FIELD BARU */}
         </div>
     );
     
-    // Handler untuk menampilkan riwayat
-    const handleShowHistory = () => {
-        setShowHistory(true);
-        fetchHistory();
-    }
-
+    // Tampilan Riwayat
     if (showHistory) {
         return (
             <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                 <div className="w-full max-w-4xl bg-white shadow-xl rounded-lg p-6">
                     <div className="flex justify-between items-center mb-6 border-b pb-3">
                         <h2 className="text-2xl font-bold text-indigo-800">Riwayat Absensi (10 Terakhir)</h2>
-                        {/* Tombol Refresh dan Tutup */}
                         <div className='flex gap-2'>
                             <button
                                 onClick={fetchHistory}
@@ -315,9 +307,7 @@ const AttendanceSystem = () => {
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {history.slice(0, 10).map((record, index) => (
                                         <tr key={index}>
-                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {record.Waktu}
-                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{record.Waktu}</td>
                                             <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
                                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                                     record.Aksi === 'masuk' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
@@ -325,23 +315,19 @@ const AttendanceSystem = () => {
                                                     {record.Aksi.toUpperCase()}
                                                 </span>
                                             </td>
-                                            {/* Data Keperluan */}
                                             <td className="px-3 py-4 text-sm text-gray-900 max-w-xs overflow-hidden text-ellipsis">
                                                 {record.Keperluan || record.keperluan || 'N/A'} 
                                             </td>
-                                            {/* End Data Keperluan */}
                                             <td className="px-3 py-4 whitespace-nowrap">
-                                                {/* Tinjauan Foto */}
                                                 {record.URL_Foto && record.URL_Foto !== 'N/A' ? (
                                                     <a href={record.URL_Foto} target="_blank" rel="noopener noreferrer">
-                                                        
+                                                        Lihat Foto
                                                     </a>
                                                 ) : (
                                                     <span className="text-gray-400">N/A</span>
                                                 )}
                                             </td>
                                             <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {/* Tautan Google Maps */}
                                                 {record.Lokasi && (
                                                     <a 
                                                         href={`https://www.google.com/maps/search/?api=1&query=${record.Lokasi}`} 
@@ -378,7 +364,6 @@ const AttendanceSystem = () => {
                             day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
                         })}
                     </div>
-                    {/* Tombol Lihat Riwayat */}
                     <button
                         onClick={handleShowHistory}
                         className="mt-4 w-full py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
@@ -404,10 +389,8 @@ const AttendanceSystem = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     
-                    {/* 1. Keterangan Wajib Absensi Keluar */}
                     {status === 'Keluar' && <KeteranganKeluar />}
 
-                    {/* 2. Pertanyaan Wajib Absensi Keluar + Keperluan */}
                     {status === 'Keluar' && <WajibTanyaKeluar />}
                     
                     {/* Bagian Kamera */}
